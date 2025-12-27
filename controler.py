@@ -27,21 +27,17 @@ def scan():
     else:
         return results
 
-def move_cursor(x_dir,ydir):
+
+def move_cursor(x_dir,y_dir):
     x, y = pyautogui.position()
-
     screen_w, screen_h = pyautogui.size()
-    mult  = 5000
-    if x_dir<0.005 and ydir< 0.005:
-        mult = 1000
+    dir_len_x,dir_len_y = 640,480
 
-    x,y = x+x_dir*mult, y+ydir*mult
+    x,y = x+x_dir*screen_w, y+y_dir*screen_h
     x = max(10, min(x, screen_w - 10))
     y = max(10, min(y, screen_h - 10))
 
-
-
-    pyautogui.moveTo(x, y)
+    pyautogui.moveTo(x, y,duration=0.05)
 
 
 def drag_obj():
@@ -90,6 +86,7 @@ def open_obj():
 
                 if handPose['hand_open']:
                     print('open')
+                    pyautogui.click()
                     pyautogui.press('enter')
 
                     return
@@ -153,6 +150,7 @@ while True:
                 if last_index == [0,0]:
                     last_index = [index.x,index.y]
                 else:
+                    print(index)
                     move_cursor(index.x - last_index[0], index.y - last_index[1])
                     last_index = [index.x,index.y]
 
