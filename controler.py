@@ -10,6 +10,9 @@ mp_draw = mp.solutions.drawing_utils
 
 cap = cv2.VideoCapture(0)
 
+screen_w, screen_h = pyautogui.size()
+
+
 
 def scan():
     success, img = cap.read()
@@ -30,8 +33,6 @@ def scan():
 
 def move_cursor(x_dir,y_dir):
     x, y = pyautogui.position()
-    screen_w, screen_h = pyautogui.size()
-    dir_len_x,dir_len_y = 640,480
 
     x,y = x+x_dir*screen_w, y+y_dir*screen_h
     x = max(10, min(x, screen_w - 10))
@@ -63,7 +64,7 @@ def drag_obj():
                     else:
                         xdir, ydir = handLms.landmark[0].x - loc_x, handLms.landmark[0].y - loc_y
                         x, y = pyautogui.position()
-                        x, y = x + xdir*5000, y + ydir*5000
+                        x, y = x + xdir*screen_w, y + ydir*screen_h
                         print(x,y)
                         x = max(50, min(x, screen_w - 50))
                         y = max(50, min(y, screen_h - 50))
@@ -71,10 +72,13 @@ def drag_obj():
                         print(screen_w, screen_h)
                         print('*************************')
                         try:
-                            pyautogui.moveTo(x, y)
+                            pyautogui.moveTo(x, y, duration=0.05
+                                             )
                         except pyautogui.FailSafeException:
                             print("Fail-safe triggered")
                         last_index = [handLms.landmark[0].x, handLms.landmark[0].y]
+
+
 
 def open_obj():
     while True:
