@@ -16,11 +16,11 @@ screen_w, screen_h = pyautogui.size()
 def get_coordinates(hanlLms):
     return [(hanlLms.landmark[i].x, hanlLms.landmark[i].y) for i in range(21)]
 
-def normalize_landmarks(handLms):
+def normalize_landmarks(handLms): # coordinated form
     wrist = handLms[0]
     return [(x - wrist[0], y - wrist[1]) for x, y in handLms]
 
-def is_open_palm(hand_landmarks):
+def is_open_palm(hand_landmarks): # not coordinate form
     """
     Detect open palm based on Y-axis descending order
     Returns True if all 4 fingers are open
@@ -43,42 +43,10 @@ def is_open_palm(hand_landmarks):
         if not (tip < dip < pip < mcp):
             return False
 
-    return True
+    return True     # #
 
 
-def interpolate_motion(devSet, target_frames=30):
-    """
-    devSet: list of frames
-      frame -> list of 21 landmarks
-      landmark -> (dx, dy)
 
-    returns: list with exactly target_frames frames
-    """
-
-    devSet = np.array(devSet)
-    # shape: (orig_frames, 21, 2)
-
-    orig_frames = devSet.shape[0]
-
-    # Edge case: too small motion
-    if orig_frames < 2:
-        return None
-
-    # Old and new time indices
-    old_idx = np.arange(orig_frames)
-    new_idx = np.linspace(0, orig_frames - 1, target_frames)
-
-    normalized = np.zeros((target_frames, 21, 2))
-
-    for lm in range(21):
-        for axis in range(2):  # x and y
-            normalized[:, lm, axis] = np.interp(
-                new_idx,
-                old_idx,
-                devSet[:, lm, axis]
-            )
-
-    return normalized.tolist()
 
 def save_sample(sequence, label):
     FILE_NAME = "gesture_dataset_NN.json"
@@ -112,6 +80,43 @@ class Recorder:
     def __init__(self,n,continuosCap = False):
         self.lastLmc = [(0, 0)] * 21
         self.data = []  ##[[(x,y,z),...] * 30frames * n times]
+
+    def ispalmOpen(self,hand_landmarks):
+        is_open_palm(hand_landmarks)
+
+    def interpolate_motion(devSet, target_frames=30):
+        """
+        devSet: list of frames
+          frame -> list of 21 landmarks
+          landmark -> (dx, dy)
+
+        returns: list with exactly target_frames frames
+        """
+
+        devSet = np.array(devSet)
+        # shape: (orig_frames, 21, 2)
+
+        orig_frames = devSet.shape[0]
+
+        # Edge case: too small motion
+        if orig_frames < 2:
+            return None
+
+        # Old and new time indices
+        old_idx = np.arange(orig_frames)
+        new_idx = np.linspace(0, orig_frames - 1, target_frames)
+
+        normalized = np.zeros((target_frames, 21, 2))
+
+        for lm in range(21):
+            for axis in range(2):  # x and y
+                normalized[:, lm, axis] = np.interp(
+                    new_idx,
+                    old_idx,
+                    devSet[:, lm, axis]
+                )
+
+        return normalized.tolist()
 
     def capture(self):
         success, img = cap.read()
@@ -150,7 +155,7 @@ class Recorder:
             self.lastLmc = handLms
 
 
-        devSet = interpolate_motion(devSet, target_frames=15)
+        devSet = self.interpolate_motion(devSet, target_frames=15)
         if devSet:
             print(f'capture end,frames = {len(devSet)}')
             self.data.append(devSet)
@@ -166,5 +171,5 @@ class Recorder:
 
 rec = Recorder(1)
 rec.scan()
-save_sample(rec.data,'snap')
+save_sample(rec.data,'zoom')
 print()
