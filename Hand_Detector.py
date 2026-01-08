@@ -3,7 +3,7 @@ import cv2
 import mediapipe as mp
 import pyautogui
 import numpy as np
-import os ,json
+import os, json
 cap = cv2.VideoCapture(0)
 
 mp_hands = mp.solutions.hands
@@ -77,14 +77,14 @@ def save_sample(sequence, label):
         json.dump(data, f, indent=4)
 
 class Recorder:
-    def __init__(self,n,continuosCap = False):
+    def __init__(self,continuosCap = False):
         self.lastLmc = [(0, 0)] * 21
         self.data = []  ##[[(x,y,z),...] * 30frames * n times]
 
     def ispalmOpen(self,hand_landmarks):
         is_open_palm(hand_landmarks)
 
-    def interpolate_motion(devSet, target_frames=30):
+    def interpolate_motion(self,devSet, target_frames=30):
         """
         devSet: list of frames
           frame -> list of 21 landmarks
@@ -136,14 +136,17 @@ class Recorder:
             results,img = self.capture()
 
             if results.multi_hand_landmarks:
-                if is_open_palm(results.multi_hand_landmarks[0]):
-                    break
                 for handLms in results.multi_hand_landmarks:
                     mp_draw.draw_landmarks(img, handLms, mp_hands.HAND_CONNECTIONS)
+                cv2.imshow(f"Hand Detection ", img)
+                if is_open_palm(results.multi_hand_landmarks[0]):
+                    if cv2.waitKey(1) & 0xFF == 27:
+                        break
+                    break
             else:
                 continue
 
-            cv2.imshow(f"Hand Detection ", img)
+
             if cv2.waitKey(1) & 0xFF == 27:
                     return results
             ##################################################################################################################
@@ -155,10 +158,11 @@ class Recorder:
             self.lastLmc = handLms
 
 
+
         devSet = self.interpolate_motion(devSet, target_frames=15)
         if devSet:
             print(f'capture end,frames = {len(devSet)}')
-            self.data.append(devSet)
+            self.data = devSet      #self.data.append(devSet)
 
     def scan(self):
 
@@ -168,8 +172,10 @@ class Recorder:
                 print('detecting')
                 self.storeMotion()
 
+    def destroyWindow(self):
+        cv2.destroyAllWindows()
 
-rec = Recorder(1)
-rec.scan()
-save_sample(rec.data,'zoom')
-print()
+# rec = Recorder()
+# rec.scan()
+# save_sample(rec.data,'zoom')
+# print()

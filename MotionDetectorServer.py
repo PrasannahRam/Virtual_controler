@@ -5,8 +5,8 @@ import joblib
 from tensorflow.keras.models import load_model
 
 model = load_model("gesture_nn_best.h5")
-scaler = joblib.load("scaler.pkl")
-le = joblib.load("label_encoder.pkl")
+scaler = joblib.load("model/scaler.pkl")
+le = joblib.load("model/label_encoder.pkl")
 
 app = Flask(__name__)
 

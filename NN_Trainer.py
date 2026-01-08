@@ -77,5 +77,5 @@ history = model.fit(
 callbacks=[early_stop, checkpoint],
     verbose=1
 )
-joblib.dump(scaler, "scaler.pkl")
-joblib.dump(le, "label_encoder.pkl")
+joblib.dump(scaler, "model/scaler.pkl")
+joblib.dump(le, "model/label_encoder.pkl")
