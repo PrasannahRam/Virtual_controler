@@ -1,14 +1,12 @@
 from flask import Flask, request, jsonify
 import numpy as np
 import tensorflow as tf
+import joblib
+from tensorflow.keras.models import load_model
 
-# --------------------
-# Load model ONCE
-# --------------------
-model = tf.keras.models.load_model("gesture_nn_best.h5")
-
-# If you used string labels during training
-LABELS = ["catch", "snap", "zoom"]  # adjust order if needed
+model = load_model("gesture_nn_best.h5")
+scaler = joblib.load("scaler.pkl")
+le = joblib.load("label_encoder.pkl")
 
 app = Flask(__name__)
 
@@ -19,33 +17,22 @@ app = Flask(__name__)
 def predict():
     data = request.json
 
-    if "features" not in data:
-        return jsonify({"error": "No features provided"}), 400
+    # Expecting sequence: [[dx,dy,dz], ...]
+    sequence = data["sequence"]
 
-    features = np.array(data["features"], dtype=np.float32)
+    features = np.array(sequence).flatten()
+    features_scaled = scaler.transform([features])
 
-    # Shape: (features,) → (1, features)
-    features = np.expand_dims(features, axis=0)
+    prediction = model.predict(features_scaled)
+    class_id = np.argmax(prediction)
+    label = le.inverse_transform([class_id])[0]
 
-    # Model prediction
-    preds = model.predict(features, verbose=0)
 
-    confidence = float(np.max(preds))
-    label_index = int(np.argmax(preds))
-    label = LABELS[label_index]
-
-    # Unknown gesture rejection
-    if confidence < 0.6:
-        return jsonify({
-            "gesture": "unknown",
-            "confidence": confidence
-        })
 
     return jsonify({
-        "gesture": label,
-        "confidence": confidence
+        "prediction": label,
+        "confidence": float(np.max(prediction))
     })
 
-
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000, debug=False)
+    app.run(host="127.0.0.1", port=5000, debug=True)
