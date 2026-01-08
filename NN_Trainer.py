@@ -7,7 +7,8 @@ from tensorflow.keras.layers import Dense, Dropout
 from tensorflow.keras.utils import to_categorical
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.callbacks import EarlyStopping
-
+from tensorflow.keras.callbacks import ModelCheckpoint
+import joblib
 
 with open("gesture_dataset_NN.json", "r") as f:
     data = json.load(f)
@@ -36,11 +37,20 @@ X_train, X_val, y_train, y_val = train_test_split(
     X_scaled, y_cat, test_size=0.2, random_state=42
 )
 
-
+# Stop over fitting
 early_stop = EarlyStopping(
     monitor="val_loss",
     patience=5,
     restore_best_weights=True
+)
+
+# Pickup a echo with lower validation lose
+checkpoint = ModelCheckpoint(
+    "gesture_nn_best.h5",
+    monitor="val_loss",        # or "val_accuracy"
+    save_best_only=True,
+    save_weights_only=False,
+    verbose=1
 )
 
 model = Sequential([
@@ -64,5 +74,8 @@ history = model.fit(
     validation_data=(X_val, y_val),
     epochs=50,
     batch_size=8,
+callbacks=[early_stop, checkpoint],
     verbose=1
 )
+joblib.dump(scaler, "scaler.pkl")
+joblib.dump(le, "label_encoder.pkl")
