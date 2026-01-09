@@ -4,7 +4,7 @@ import tensorflow as tf
 import joblib
 from tensorflow.keras.models import load_model
 
-model = load_model("gesture_nn_best.h5")
+model = load_model("model/gesture_nn_best.h5")
 scaler = joblib.load("model/scaler.pkl")
 le = joblib.load("model/label_encoder.pkl")
 
@@ -27,7 +27,15 @@ def predict():
     class_id = np.argmax(prediction)
     label = le.inverse_transform([class_id])[0]
 
+    # print(prediction)
 
+    if float(np.max(prediction)) < 0.9 :
+        return jsonify(
+            {
+                "prediction": "unknown",
+                "confidence": float(np.max(prediction))
+            }
+        )
 
     return jsonify({
         "prediction": label,

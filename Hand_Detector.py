@@ -4,33 +4,36 @@ import mediapipe as mp
 import pyautogui
 import numpy as np
 import os, json
+
 cap = cv2.VideoCapture(0)
 
 mp_hands = mp.solutions.hands
 hands = mp_hands.Hands()
 mp_draw = mp.solutions.drawing_utils
 
-
 screen_w, screen_h = pyautogui.size()
+
 
 def get_coordinates(hanlLms):
     return [(hanlLms.landmark[i].x, hanlLms.landmark[i].y) for i in range(21)]
 
-def normalize_landmarks(handLms): # coordinated form
+
+def normalize_landmarks(handLms):  # coordinated form
     wrist = handLms[0]
     return [(x - wrist[0], y - wrist[1]) for x, y in handLms]
 
-def is_open_palm(hand_landmarks): # not coordinate form
+
+def is_open_palm(hand_landmarks):  # not coordinate form
     """
     Detect open palm based on Y-axis descending order
     Returns True if all 4 fingers are open
     """
 
     fingers = [
-        [5, 6, 7, 8],     # Index
-        [9, 10, 11, 12], # Middle
-        [13, 14, 15, 16],# Ring
-        [17, 18, 19, 20] # Pinky
+        [5, 6, 7, 8],  # Index
+        [9, 10, 11, 12],  # Middle
+        [13, 14, 15, 16],  # Ring
+        [17, 18, 19, 20]  # Pinky
     ]
 
     for finger in fingers:
@@ -43,9 +46,7 @@ def is_open_palm(hand_landmarks): # not coordinate form
         if not (tip < dip < pip < mcp):
             return False
 
-    return True     # #
-
-
+    return True  # #
 
 
 def save_sample(sequence, label):
@@ -77,14 +78,15 @@ def save_sample(sequence, label):
         json.dump(data, f, indent=4)
 
 class Recorder:
-    def __init__(self,continuosCap = False):
+    def __init__(self, continuosCap=False, trainingMode=False):
         self.lastLmc = [(0, 0)] * 21
         self.data = []  ##[[(x,y,z),...] * 30frames * n times]
+        self.trainingMode = trainingMode
 
-    def ispalmOpen(self,hand_landmarks):
+    def ispalmOpen(self, hand_landmarks):
         is_open_palm(hand_landmarks)
 
-    def interpolate_motion(self,devSet, target_frames=30):
+    def interpolate_motion(self, devSet, target_frames=30):
         """
         devSet: list of frames
           frame -> list of 21 landmarks
@@ -123,57 +125,98 @@ class Recorder:
         img = cv2.flip(img, 1)
         imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         results = hands.process(imgRGB)
-        return results,img
+        return results, img
 
     def captureDev(self, handLms):  # converts from position to deviation
         landmarkDeviation = [tuple(map(lambda j, k: j - k, self.lastLmc[n], handLms[n])) for n in range(21)]
         return landmarkDeviation
 
-    def storeMotion(self):
-        devSet = []
+    def display(self, img, hand=None):
+        if hand:
+            for handLms in hand:
+                mp_draw.draw_landmarks(img, handLms, mp_hands.HAND_CONNECTIONS)
+            cv2.imshow(f"Hand Detection ", img)
 
+        else:
+            cv2.imshow(f"Hand Detection ", img)
+        if cv2.waitKey(1) & 0xFF == 27:
+            return
+
+    def checkMotion(self):
+        devSet = []
+        start = time.time()
         while True:
-            results,img = self.capture()
+            results, img = self.capture()
 
             if results.multi_hand_landmarks:
-                for handLms in results.multi_hand_landmarks:
-                    mp_draw.draw_landmarks(img, handLms, mp_hands.HAND_CONNECTIONS)
-                cv2.imshow(f"Hand Detection ", img)
-                if is_open_palm(results.multi_hand_landmarks[0]):
-                    if cv2.waitKey(1) & 0xFF == 27:
-                        break
-                    break
+                self.display(img, results.multi_hand_landmarks)
             else:
+                self.display(img)
                 continue
-
-
-            if cv2.waitKey(1) & 0xFF == 27:
-                    return results
+            if is_open_palm(results.multi_hand_landmarks[0]):               # Stop capturing motion when hand back to open
+                break
             ##################################################################################################################
+            # Check for holding
+            motionTime = round(time.time() - start, 2)
+            if not self.trainingMode and motionTime > 1.2:                  # Holding options are not used to training
+                handPose = self.detctPose(results.multi_hand_landmarks[0])  # Get the hand pose
+                return
 
-            handLms = get_coordinates(results.multi_hand_landmarks[0])
-            handLms = normalize_landmarks(handLms)
-            dev = self.captureDev(handLms)
-            devSet.append(dev)
-            self.lastLmc = handLms
+            ##################################################################################################################
+            # Get the vector of motion
+            handLms = get_coordinates(results.multi_hand_landmarks[0])  # Get coordinate form list [[x,y],...]
+            handLms = normalize_landmarks(handLms)                      # Get the relative positions from wrist
+            dev = self.captureDev(handLms)                              # Get the distances of fingers from last frame
+            devSet.append(dev)                                          # Store it under dev list
+            self.lastLmc = handLms                                      # State the frame as last frame
 
+        devSet = self.interpolate_motion(devSet, target_frames=15)      # Set the number of motions to targeted frames
+                                                                        # (so every motion would be in same frame)
 
-
-        devSet = self.interpolate_motion(devSet, target_frames=15)
-        if devSet:
+        if devSet:  # Only do when there is a motion of hand
             print(f'capture end,frames = {len(devSet)}')
-            self.data = devSet      #self.data.append(devSet)
+            self.data.append(devSet)
+            # print(round(time.time() - start, 2))
+
+    def resetData(self):
+        self.data = []
 
     def scan(self):
-
+        # Call when training
         while len(self.data) < 50:
             results, _ = self.capture()
-            if results.multi_hand_landmarks and not is_open_palm(results.multi_hand_landmarks[0]):
+            if results.multi_hand_landmarks and not is_open_palm(
+                    results.multi_hand_landmarks[0]):                   # Start motion when hand is not opened
                 print('detecting')
-                self.storeMotion()
+                self.checkMotion()
 
-    def destroyWindow(self):
-        cv2.destroyAllWindows()
+    def detctPose(self, handLms):
+        handPose = {'indexing': False, 'landmark': [0, 0, 0], 'hand_closed': False}
+
+        finger_tips = [12, 16, 20]  # Middle, Ring, Pinky
+        palm_closed = True
+        palm_open = True
+
+        for tip in finger_tips:
+            if handLms.landmark[tip].y < handLms.landmark[tip - 2].y:
+                palm_closed = False
+                break
+
+        index_open = (handLms.landmark[8].y < handLms.landmark[7].y < handLms.landmark[6].y)
+
+        # for tip in finger_tips:
+        #     if handLms.landmark[tip].y > handLms.landmark[tip - 2].y:
+        #         palm_open = False
+        #         break
+
+        if palm_closed and index_open:
+            handPose['indexing'] = True
+            handPose['landmark'] = handLms.landmark[8]
+        elif (not index_open) and palm_closed:
+            handPose['hand_closed'] = True
+            handPose['landmark'] = handLms.landmark[0]
+
+        return handPose
 
 # rec = Recorder()
 # rec.scan()
