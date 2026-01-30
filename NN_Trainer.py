@@ -13,8 +13,6 @@ import joblib
 with open("gesture_dataset_NN.json", "r") as f:
     data = json.load(f)
 
-
-
 X = []
 y = []
 

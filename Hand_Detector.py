@@ -4,7 +4,7 @@ import mediapipe as mp
 import pyautogui
 import numpy as np
 import os, json
-
+from ControlCursor import ControlCursor
 cap = cv2.VideoCapture(0)
 
 mp_hands = mp.solutions.hands
@@ -12,6 +12,7 @@ hands = mp_hands.Hands()
 mp_draw = mp.solutions.drawing_utils
 
 screen_w, screen_h = pyautogui.size()
+
 
 
 def get_coordinates(hanlLms):
@@ -77,11 +78,16 @@ def save_sample(sequence, label):
     with open(FILE_NAME, "w") as f:
         json.dump(data, f, indent=4)
 
+
+cursor = ControlCursor()
+
+
 class Recorder:
     def __init__(self, continuosCap=False, trainingMode=False):
         self.lastLmc = [(0, 0)] * 21
         self.data = []  ##[[(x,y,z),...] * 30frames * n times]
         self.trainingMode = trainingMode
+        self.cursor = ControlCursor
 
     def ispalmOpen(self, hand_landmarks):
         is_open_palm(hand_landmarks)
@@ -154,12 +160,17 @@ class Recorder:
                 self.display(img)
                 continue
             if is_open_palm(results.multi_hand_landmarks[0]):               # Stop capturing motion when hand back to open
+                # self.display(img)
                 break
             ##################################################################################################################
             # Check for holding
             motionTime = round(time.time() - start, 2)
+
+            # Write logis here for update holding pose and the actions
             if not self.trainingMode and motionTime > 1.2:                  # Holding options are not used to training
                 handPose = self.detctPose(results.multi_hand_landmarks[0])  # Get the hand pose
+                if handPose['indexing']:
+                    cursor.moveCursor(handPose['landmark'])
                 return
 
             ##################################################################################################################
@@ -175,7 +186,11 @@ class Recorder:
 
         if devSet:  # Only do when there is a motion of hand
             print(f'capture end,frames = {len(devSet)}')
-            self.data.append(devSet)
+
+            if self.trainingMode == True:
+                self.data.append(devSet)
+            else:
+                ... # Write logics here for the detect motion with the devSet
             # print(round(time.time() - start, 2))
 
     def resetData(self):
@@ -190,7 +205,7 @@ class Recorder:
                 print('detecting')
                 self.checkMotion()
 
-    def detctPose(self, handLms):
+    def detctPose(self, handLms):               # Write logics here to detect the holding pose
         handPose = {'indexing': False, 'landmark': [0, 0, 0], 'hand_closed': False}
 
         finger_tips = [12, 16, 20]  # Middle, Ring, Pinky
