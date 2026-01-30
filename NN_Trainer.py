@@ -11,7 +11,7 @@ from tensorflow.keras.callbacks import ModelCheckpoint
 import joblib
 
 with open("gesture_dataset_NN.json", "r") as f:
-    data = json.load(f)
+    data = json.load(f)te
 
 X = []
 y = []
